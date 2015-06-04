@@ -71,7 +71,7 @@ function generateRock(ppr,index) {
 	this.pos = {};
 	this.pos.x = 0;
 	this.pos.y = 0;
-	this.pos.r = 1;
+	this.pos.r = 0;
 	
 	this.M = total;
 	this.E = 1;
