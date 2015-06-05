@@ -1,5 +1,5 @@
-//function to plot a shape
 function trace(shape) {
+//draws a filled polygon
 	c.ctx.beginPath();
 	for(var point = 0; point < shape.tCoords.length; point++) {
 		c.ctx.lineTo(shape.tCoords[point].x, shape.tCoords[point].y);
@@ -11,18 +11,15 @@ function trace(shape) {
 	c.ctx.strokeStyle = "black";
 	c.ctx.closePath();
 	c.ctx.stroke();
-
-	//c.ctx.fillStyle = "blue";
-	//c.ctx.fillRect(shape.tCom.x-1,shape.tCom.y-1,2,2);
 	
 	c.ctx.textAlign = "center";
 	c.ctx.font="10px Showcard Gothic";
 	c.ctx.fillStyle = "black";
 	c.ctx.fillText(shape.id,shape.tCom.x,shape.tCom.y+5);
 }
-		
-//function to plot the major axis on the graphs
+
 function addGrid() {
+//draws a grid
 	for(var i = 1; i < c.divisions; i++) {
 		c.ctx.beginPath();
 		c.ctx.lineTo(i/c.divisions*c.wide, 0);
@@ -38,5 +35,15 @@ function addGrid() {
 		c.ctx.strokeStyle = c.gridColour;
 		c.ctx.stroke();
 	}
+}
 
+function drawLine(A, B){
+//draws a line from point A to B
+	c.ctx.beginPath();
+	c.ctx.lineTo(A.x, A.y);
+	c.ctx.lineTo(B.x, B.y);
+	
+	c.ctx.lineWidth = 2;
+	c.ctx.strokeStyle = "purple";
+	c.ctx.stroke();
 }

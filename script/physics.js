@@ -1,129 +1,7 @@
-/*
-Goal for physics library - Pass objects in, get impulses out
-
--------------------------------
-short term - impulse resolution
--------------------------------
-
-Collisions
-	(check) point in poly
-	(reaction) moment of inertia/area, mass and velocities
-	return the impulse and direction vector so we can resolve the other forces
-	restitution
-
-ropes and cables
-	tension calculator (use impulses, not forces)
-	how do bodies joined by a cable rotate?
-	
-deformation and splitting
-	sound effects
-	decide the split path
-	absorbs some impulse????
-	
-explosions
-	ray casting algorithm (force decays with distance)
-	orthogonal component of cast rays	
-	
-gravity
-	classical mechanics for attractive forces
-	maybe passive attraction between everything?
-	Gravity wells are the only attractive objects
-	Fields needn't be circular, they could be normal to closest surface	
-
-propulsion
-	subset of explosions???
-	constant linear force	
-		
-* Remember that all constant forces are pulsed at a 1 frame interval
-
---------------------
-Freaky Stretch goals
---------------------
-
-light
-	force due to light???
-	heating due to light???
-	radiation???
-	scattering and refelecting light (ray tracing)
-	
-
-electricity
-	determine electric potentials from dissimilar materials
-	account for effects of electrolyte
-	
-thermal
-	conduction of heat
-	radiation
-	change of state (could exert forces???)
-	expansion (could exert forces???)
-	
----------------------------
-do these things every frame
----------------------------
-
-	1) resolve all the impulses
-	2) resolve the deformations to decrease impulses
-	3) then find changes in velocity and angular velocity
-	4) calculate movements
-*/
-
-function rigidResponse (objectA,objectB,P,N) { 
-	//takes in two colliding objects, point of collision, surface normal vector
-	//returns impulse magnitude
-
-	var mA = objectA.M;
-	var mB = objectB.M;
-	
-	var IA = objectA.I;
-	var IB = objectB.I;
-	
-	var vAx1 = objectA.speed.x;
-	var vAy1 = objectA.speed.y;
-	var vAr1 = objectA.speed.r;
-	
-	var vBx1 = objectB.speed.x;
-	var vBy1 = objectB.speed.y;
-	var vBr1 = objectB.speed.r;
-	
-	var rAP = vSubtract(objectA.pos,P);
-	var rBP = vSubtract(objectB.pos,P);
-	
-	var vABx = vAx1 + (-vAr1*rAP.y) - vBx1 - (-vBr1*rBP.y);
-	var vABy = vAy1 + (vAr1*rAP.x) - vBy1 - (vBr1*rBP.x);
-	
-	var e = Math.min(objectA.E, objectB.E);
-	
-	return (-(1 + e)*(vABx*N.x + vABy*N.y))/(1/mA + 1/mB + Math.pow((rAP.x*N.y - rAP.y*N.x),2)/IA + Math.pow((rBP.x*N.y - rBP.y*N.x),2)/IB);
-}
-function edgeCheck (shape) {
-	//bounce off the top and bottom
-	if(shape.pos.y < -c.high/c.divisions || shape.pos.y > c.high*(1 + 1/c.divisions)) shape.speed.y = -shape.speed.y;/*{
-		shape.speed.y += a.speeeed/10;
-	} else if(shape.pos.y > c.high) {
-		shape.speed.y -= a.speeeed/10; 
-	}*/
-	//bounce off the sides
-	if(shape.pos.x < -c.wide/c.divisions || shape.pos.x > c.wide*(1 + 1/c.divisions)) shape.speed.x = -shape.speed.x;/*{
-		shape.speed.x += a.speeeed/10;
-	} else if(shape.pos.x > c.wide) {
-		shape.speed.x -= a.speeeed/10; 
-	}*/
-}
-
-function applyImpulse (object, j, N, P) {
-	//takes in an object, impulse, direction vector and point of application,
-	//applies impluse to cause change in velocity of object
-	
-	rP = vSubtract(object.pos,P);
-	
-	object.speed.x += (j*N.x)/object.M;
-	object.speed.y += (j*N.y)/object.M;
-	object.speed.r += (rP.x * j * N.y - rP.y * j * N.x)/object.I;
-}
-
 function goodFix(shape, shape2, numSteps) {
+//slides objects apart gemoetrically for collision resolution
 
-	while(checkCollisions(shape,shape2))  {
+	while(checkOverlap(shape,shape2))  {
 
 		var M = 2*distance(shape.pos,shape2.pos)
 		var Nx = (shape.pos.x-shape2.pos.x)/M
@@ -156,15 +34,13 @@ function goodFix(shape, shape2, numSteps) {
 }
 
 function generalMotion(shape, modifier) {
+//applies movement properties to objects
+
 	//translation is px/frame, rotation in radians/frame
 	shape.pos.x += modifier*shape.speed.x;
 	shape.pos.y += modifier*shape.speed.y;
 	shape.pos.r += modifier*shape.speed.r;
 	shape.pos.r %= 2*Math.PI;
-	
-	//console.log(shape.pos.r);
-	
-	var redraw = false;
 
 	for(var i = 0; i < shape.bCoords.length; i++) {
 		//rotations
@@ -174,155 +50,61 @@ function generalMotion(shape, modifier) {
 		shape.tCoords[i].x = shape.tCoords[i].x + shape.pos.x;
 		shape.tCoords[i].y = shape.tCoords[i].y + shape.pos.y;
 	}
+	
+	//console.log(shape.speed);
+	
+	
+	//probably don't need these lines
 	shape.tCom.x = shape.bCom.x + shape.pos.x;
 	shape.tCom.y = shape.bCom.y + shape.pos.y;
 }
-//function to quickly check overlaps
-function checkCollisions(item1, item2){
-	for(var i = 0; i < item1.tCoords.length; i++){
-		if(pointInPolygon(item1.tCoords[i], item2.tCoords)){
-			return true;
-		}
-	}
-	
-	for (i = 0; i < item2.tCoords.length; i++) {
-		if (pointInPolygon(item2.tCoords[i],item1.tCoords)) {
-			return true;
-		}
-	}
-	return false;
-}
-//function to check collisions
-function getCollisionData(item1, item2){
-    var obj = {};
-	obj.P = {};
-	obj.N = {}
-	obj.flag = false;
-	obj.result = false;
-	var pointsInside = [];
-	
-	//checking item1 in item2
-	for(var i = 0; i < item1.tCoords.length; i++){
-		if(pointInPolygon(item1.tCoords[i], item2.tCoords)){
-			//item1.colour.current = a.colour.colide;
-			//item2.colour.current = a.colour.colide;
-			pointsInside.push(item1.tCoords[i]);
-			//if it's completely inside or something
-		}
-	}	
-	if (pointsInside.length != 0) {
-	
-			if (pointsInside.length > 1) {
-				obj.P = vAvg(pointsInside)
-			} else {
-				obj.P = pointsInside[0]
-			}
-			
-			for (var k = 0; k < item2.tCoords.length; k++) {
-				var l = k + 1;
-				if (l > item2.tCoords.length - 1)
-					l = 0;
-				if (intersect(obj.P,item1.pos,item2.tCoords[k],item2.tCoords[l])){
-					obj.N = findNormal(vSubtract(item2.tCoords[l],item2.tCoords[k]));
-					obj.flag = false;
-					obj.result = true;
-					return obj;
-				}
-			}
-			
-			for (var k = 0; k < item2.tCoords.length; k++) {
-				var l = k + 1;
-				if (l > item2.tCoords.length - 1)
-					l = 0;
-				if (intersect(pointsInside[0],item1.pos,item2.tCoords[k],item2.tCoords[l])){
-					obj.N = findNormal(vSubtract(item2.tCoords[l],item2.tCoords[k]));
-					obj.flag = false;
-					obj.result = true;
-					return obj;
-				}
-					
-			}
-			
-			//obj.P = {'x': item1.tCoords[i].x, 'y': item1.tCoords[i].y};
-			obj.N = {};
-			obj.N.x = (obj.P.x - item2.tCom.x)/Math.sqrt((obj.P.x-item2.tCom.x)*(obj.P.x-item2.tCom.x)+(obj.P.y-item2.tCom.y)*(obj.P.y-item2.tCom.y))
-			obj.N.y = (obj.P.y - item2.tCom.y)/Math.sqrt((obj.P.x-item2.tCom.x)*(obj.P.x-item2.tCom.x)+(obj.P.y-item2.tCom.y)*(obj.P.y-item2.tCom.y))
-			//obj.N.x = 1
-			//obj.N.y = 0
-			//console.log(obj.N)
-			console.log("FUCK", item1.id, pointsInside);
-			rClick();
-			obj.flag = false;
-			obj.result = true;
-			return obj;
-	}
 
-	pointsInside = [];
+function checkCollisions(item1, item2, collisionInfo){
+
+	var v1 = {};
+	v1.x = item1.speed.x;
+	v1.y = item1.speed.y;
+	v1.r = item1.speed.r;
 	
-	//checking item2 in item1
-	for (i = 0; i < item2.tCoords.length; i++) {
-		if (pointInPolygon(item2.tCoords[i],item1.tCoords)) {
-			pointsInside.push(item2.tCoords[i]);
-			//if it's completely inside or something
-		}
-	}
-	if (pointsInside.length != 0) {
-			if (pointsInside.length > 1) {
-				obj.P = vAvg(pointsInside)
-			} else {
-				obj.P = pointsInside[0]
-			}
-			
-			for (var k = 0; k < item1.tCoords.length; k++) {
-				var l = k + 1;
-				if (l > item1.tCoords.length - 1)
-					l = 0;
-				if (intersect(obj.P,item2.pos,item1.tCoords[k],item1.tCoords[l])){
-					obj.N = findNormal(vSubtract(item1.tCoords[l],item1.tCoords[k]));
-					obj.flag = true;
-					obj.result = true;
-					return obj;
-				}
-			}
-		
-			for (var k = 0; k < item1.tCoords.length; k++) {
-				var l = k + 1;
-				if (l > item1.tCoords.length - 1)
-					l = 0;
-				if (intersect(pointsInside[0],item2.pos,item1.tCoords[k],item1.tCoords[l])){
-					obj.N = findNormal(vSubtract(item1.tCoords[l],item1.tCoords[k]));
-					obj.flag = false;
-					obj.result = true;
-					return obj;
-				}
-					
-			}
-			
-			obj.N = {};
-			obj.N.x = (obj.P.x - item1.tCom.x)/Math.sqrt((obj.P.x-item1.tCom.x)*(obj.P.x-item1.tCom.x)+(obj.P.y-item1.tCom.y)*(obj.P.y-item1.tCom.y))
-			obj.N.y = (obj.P.y - item1.tCom.y)/Math.sqrt((obj.P.x-item1.tCom.x)*(obj.P.x-item1.tCom.x)+(obj.P.y-item1.tCom.y)*(obj.P.y-item1.tCom.y))
-			console.log("FUCK", item2.id, pointsInside);
-			rClick();
-			obj.flag = true;
-			obj.result = true;
-			return obj;
-	}
-	//console.log("snowflake")
-	return obj;
+	var v2 = {};
+	v2.x = item2.speed.x;
+	v2.y = item2.speed.y;
+	v2.r = item2.speed.r;	
+	
+	var r1P = vSub(item1.pos,collisionInfo.P);
+	var r2P = vSub(item2.pos,collisionInfo.P);
+	
+	var v12 = {};
+	v12.x = v1.x + (-v1.r*r1P.y) - v2.x - (-v2.r*r2P.y);
+	v12.y = v1.y + (v1.r*r1P.x) - v2.y - (v2.r*r2P.x);
+	
+	console.log(dProduct(v12, collisionInfo.N)*(2*collisionInfo.flag-1))
+	return dProduct(v12, collisionInfo.N)*(2*collisionInfo.flag-1);
+	
+	//this stuff is in checkOverlap now
+	// for(var i = 0; i < item1.tCoords.length; i++){
+		// if(pointInPolygon(item1.tCoords[i], item2.tCoords)){
+			// return true;
+		// }
+	// }
+	
+	// for (i = 0; i < item2.tCoords.length; i++) {
+		// if (pointInPolygon(item2.tCoords[i],item1.tCoords)) {
+			// return true;
+		// }
+	// }
+	// return false;
 }
-	
-//function to see if point is in polygon
+
 function pointInPolygon(point, poly) {
-	var j = a.points - 1;
+//check if a point is in a polygon
+
 	var colide = false;
 	
-	var x = point.x;
-	var y = point.y;
-	
+	var j = a.points - 1;
 	for (var i=0; i < a.points; i++){
-		if (poly[i].y < y && poly[j].y >= y ||  poly[j].y < y && poly[i].y >= y) {
-			//if (poly[i].x + (y - poly[i].y)/(poly[j].y - poly[i].y)*(poly[j].x - poly[i].x) < x) {
-			if ((poly[j].x - poly[i].x)/(poly[j].y - poly[i].y)*(y - poly[i].y) + poly[i].x >= x) {
+		if (poly[i].y < point.y && poly[j].y >= point.y ||  poly[j].y < point.y && poly[i].y >= point.y) {
+			if ((poly[j].x - poly[i].x)/(poly[j].y - poly[i].y)*(point.y - poly[i].y) + poly[i].x >= point.x) {
 				colide = !colide;
 			}
 		}
@@ -331,61 +113,167 @@ function pointInPolygon(point, poly) {
 	return colide;
 }
 
-		function pointInPolygon2(p,vertices) {
-			
-			//Loop through vertices, check if point is left of each line.
-			//If it is, check if it line intersects with horizontal ray from point p
-			
-			var n = vertices.length;
-			var j = 0;
-			var v1 = {};  
-			var v2 = {};
-			var count = 0;
-			for (var i = 0; i < n; i++)
-			{
-				j = i + 1;
-				if (j == n) j = 0;
-				v1 = vertices[i];
-				v2 = vertices[j];
-				//does point lay to the left of the line?
-				if (isLeft(p,v1,v2))
-				{
-					if ((p.y > v1.y && p.y <= v2.y) || (p.y > v2.y && p.y <= v1.y))
-					{
-						count++;
-					}
-				}
-			}
-			if (count % 2 == 0) {
-				return false;
-			} else {
-				return true;
+function checkOverlap(item1, item2){
+//quickly checks overlap between two objects
+
+	for(var i = 0; i < item1.tCoords.length; i++){
+		if(pointInPolygon(item1.tCoords[i], item2.tCoords)) {
+			//console.log(item1.speed,item2.speed);
+			return true;
+		}
+	}
+	
+	for (i = 0; i < item2.tCoords.length; i++) {
+		if (pointInPolygon(item2.tCoords[i],item1.tCoords)) {
+			//console.log(item1.speed,item2.speed);
+			return true;
+		}
+	}
+	
+	return false;
+}
+
+function getCollisionData(item1, item2){
+//finds the direction vector and point of application of an impulse
+
+    var obj = {};
+	obj.P = {};
+	obj.N = {}
+	obj.flag = false;
+	var pointsInside = [];
+	
+	//checking item1 in item2
+	for(var i = 0; i < item1.tCoords.length; i++){
+		if(pointInPolygon(item1.tCoords[i], item2.tCoords)){
+			pointsInside.push(item1.tCoords[i]);
+		}
+	}
+	
+	if (pointsInside.length != 0) {
+	
+		
+		if (pointsInside.length > 1) {
+			obj.P = vAvg(pointsInside);
+			rClick();
+		} else {
+			obj.P = {'x': pointsInside[0].x, 'y': pointsInside[0].y} ;
+		}
+		
+		for (var k = 0; k < item2.tCoords.length; k++) {
+			var l = k + 1;
+			if (l > item2.tCoords.length - 1)
+				l = 0;
+			if (intersect(obj.P, item1.pos,item2.tCoords[k], item2.tCoords[l])){
+				console.log(obj.P)
+				obj.N = findNormal(vSub(item2.tCoords[l], item2.tCoords[k]));
+				obj.flag = false;
+				return obj;
 			}
 		}
 		
-		function isLeft(p, v1, v2) {
-			
-			if (v1.x == v2.x)
-			{
-				if (p.x <= v1.x)
-				{
-					return true;
-				} else {
-					return false;
-				}
-			} else {
-				var m = (v2.y - v1.y) / (v2.x - v1.x);
-				var x2 = (p.y - v1.y) / m + v1.x;
-				if (p.x <= x2) {
-					return true;
-				} else {
-					return false;
-				}
+		for (var k = 0; k < item2.tCoords.length; k++) {
+			var l = k + 1;
+			if (l > item2.tCoords.length - 1) l = 0;
+			if (intersect(pointsInside[0], item1.pos,item2.tCoords[k], item2.tCoords[l])){
+				obj.N = findNormal(vSub(item2.tCoords[l], item2.tCoords[k]));
+				obj.flag = false;
+				return obj;
 			}
+				
 		}
 		
-//function to return the instantaneuos linear speed of the point
+		obj.N.x = (obj.P.x - item2.tCom.x)/Math.sqrt((obj.P.x - item2.tCom.x)*(obj.P.x - item2.tCom.x)+(obj.P.y - item2.tCom.y)*(obj.P.y - item2.tCom.y))
+		obj.N.y = (obj.P.y - item2.tCom.y)/Math.sqrt((obj.P.x - item2.tCom.x)*(obj.P.x - item2.tCom.x)+(obj.P.y - item2.tCom.y)*(obj.P.y - item2.tCom.y))
+		
+		console.log("FAKE NORMAL", "ROCK: " + item1.id, pointsInside + "POINTS INSIDE");
+		rClick();
+		obj.flag = false;
+		
+		return obj;
+	}
+
+	pointsInside = [];
+	
+	//checking item2 in item1
+	for (i = 0; i < item2.tCoords.length; i++) {
+		if (pointInPolygon(item2.tCoords[i], item1.tCoords)) {
+			pointsInside.push(item2.tCoords[i]);
+		}
+	}
+	
+	if (pointsInside.length != 0) {
+	
+		
+		if (pointsInside.length > 1) {
+			obj.P = vAvg(pointsInside);
+			rClick();
+		} else {
+			obj.P = {'x': pointsInside[0].x, 'y': pointsInside[0].y} ;
+		}
+		
+		
+		for (var k = 0; k < item1.tCoords.length; k++) {
+			var l = k + 1;
+			if (l > item1.tCoords.length - 1) l = 0;
+			if (intersect(obj.P, item2.pos, item1.tCoords[k], item1.tCoords[l])){
+				console.log(obj.P)
+				obj.N = findNormal(vSub(item1.tCoords[l], item1.tCoords[k]));
+				obj.flag = true;
+				return obj;
+			}
+		}
+	
+		for (var k = 0; k < item1.tCoords.length; k++) {
+			var l = k + 1;
+			if (l > item1.tCoords.length - 1) l = 0;
+			if (intersect(pointsInside[0], item2.pos,item1.tCoords[k], item1.tCoords[l])){
+				obj.N = findNormal(vSub(item1.tCoords[l], item1.tCoords[k]));
+				obj.flag = false;
+				return obj;
+			}	
+		}
+		
+		obj.N.x = (obj.P.x - item1.tCom.x)/Math.sqrt((obj.P.x-item1.tCom.x)*(obj.P.x-item1.tCom.x)+(obj.P.y-item1.tCom.y)*(obj.P.y-item1.tCom.y))
+		obj.N.y = (obj.P.y - item1.tCom.y)/Math.sqrt((obj.P.x-item1.tCom.x)*(obj.P.x-item1.tCom.x)+(obj.P.y-item1.tCom.y)*(obj.P.y-item1.tCom.y))
+		
+		console.log("FAKE NORMAL", "ROCK: " + item2.id, pointsInside + "POINTS INSIDE");
+		rClick();
+		obj.flag = true;
+		
+		return obj;
+	}
+	
+	return obj;
+}
+
+function rigidResponse (item1, item2, P, N) { 
+//returns impulse magnitude for two colliding objects, point of collision and surface normal vector
+
+	var rAP = vSub(item1.pos,P);
+	var rBP = vSub(item2.pos,P);
+	
+	var vAB = {};
+	vAB.x = item1.speed.x + (-item1.speed.r * rAP.y) - item2.speed.x - (-item2.speed.r * rBP.y);
+	vAB.y = item1.speed.y + (item1.speed.r * rAP.x) - item2.speed.y - (item2.speed.r * rBP.x);
+	
+	var e = Math.min(item1.E, item2.E);
+	
+	return (-(1 + e)*(vAB.x*N.x + vAB.y*N.y))/(1/item1.M + 1/item2.M + Math.pow((rAP.x*N.y - rAP.y*N.x),2)/item1.I + Math.pow((rBP.x*N.y - rBP.y*N.x),2)/item2.I);
+}
+
+function applyImpulse (object, j, N, P) {
+//applies impluse to change velocity of object given an object, impulse, direction vector and point of application
+	
+	var rP = vSub(object.pos,P);
+	
+	object.speed.x += (j*N.x)/object.M;
+	object.speed.y += (j*N.y)/object.M;
+	object.speed.r += (rP.x * j * N.y - rP.y * j * N.x)/object.I;
+}
+
 function maxSpeed(object) {
+//returns the instantaneuos linear speed of the fastes point in an object
+
 	var maximum = 0;
     for(var i = 0; i < object.tCoords.length; i++){
 		var point = object.tCoords[i];
@@ -396,4 +284,11 @@ function maxSpeed(object) {
 		maximum = Math.max(maximum, Math.sqrt(Math.pow(tempSpeed.x, 2), Math.pow(tempSpeed.y, 2)));
 	}
 	return maximum;
+}
+
+function edgeCheck (shape) {
+//turns an object around if it's headed off the edge
+
+	if(shape.pos.y < -c.high/c.divisions || shape.pos.y > c.high*(1 + 1/c.divisions)) shape.speed.y = -shape.speed.y;
+	if(shape.pos.x < -c.wide/c.divisions || shape.pos.x > c.wide*(1 + 1/c.divisions)) shape.speed.x = -shape.speed.x;
 }

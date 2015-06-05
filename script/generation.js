@@ -1,6 +1,6 @@
-//function to generate arrays of points
 function generateRock(ppr,index) {
-	
+//generates all asteroid properties
+
 	this.colour = {};
 	this.colour.base = a.colour.base;
 	this.colour.current = this.colour.base;
@@ -117,6 +117,7 @@ function generateRock(ppr,index) {
 }
 	
 function moveRock(shape, x, y) {
+//moves a rock to desired x,y coordinates
     shape.pos.x = x;
     shape.pos.y = y;
 }
